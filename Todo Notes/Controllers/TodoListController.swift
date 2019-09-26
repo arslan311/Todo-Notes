@@ -9,18 +9,22 @@
 import UIKit
 
 class TodoListController: UITableViewController {
-
     
-    var itemsArray = [""]
+    var itemsArray = [CellModel]()
     let defaults = UserDefaults.standard
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
-        if let items = defaults.array(forKey: "TodoArray") as? [String] {
+        
+        let newItem = CellModel()
+        newItem.todoMessage = "hello todo first"
+        itemsArray.append(newItem)
+        
+        if let items = defaults.array(forKey: "TodoArray") as? [CellModel] {
             itemsArray = items
         }
-//        self.tableView.register(UITableViewCell.self, forCellReuseIdentifier: "TodoListCell")
-        tableView.separatorStyle = .none
+    
     }
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -30,7 +34,17 @@ class TodoListController: UITableViewController {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
         let row = tableView.dequeueReusableCell(withIdentifier: "TodoListCell", for: indexPath)
-        row.textLabel?.text = itemsArray[indexPath.row]
+        
+        let item = itemsArray[indexPath.row]
+        row.textLabel?.text = item.todoMessage
+      
+        row.accessoryType = item.isChecked ? .checkmark : .none
+
+//        if item.isChecked == true {
+//            row.accessoryType = .checkmark
+//        }else {
+//            row.accessoryType = .none
+//        }
         return row
     }
     
@@ -38,11 +52,17 @@ class TodoListController: UITableViewController {
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
 
-        if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark{
-            tableView.cellForRow(at: indexPath)?.accessoryType = .none
-        }else{
-            tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
-        }
+        itemsArray[indexPath.row].isChecked = !itemsArray[indexPath.row].isChecked
+        tableView.reloadData()
+        
+//        if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark{
+//            tableView.cellForRow(at: indexPath)?.accessoryType = .none
+//
+//        }else{
+//            tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
+//        }
+//
+        
         let cell = tableView.cellForRow(at: indexPath)
         let bgColorView = UIView()
         bgColorView.backgroundColor = .purple
@@ -91,8 +111,10 @@ class TodoListController: UITableViewController {
         
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             
-            self.itemsArray.append(textField.text!)
-
+            let item = CellModel()
+            item.todoMessage = textField.text!
+            self.itemsArray.append(item)
+            
             self.defaults.set(self.itemsArray, forKey: "TodoArray")
             self.tableView.reloadData()
         }
