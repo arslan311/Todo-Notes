@@ -12,10 +12,13 @@ class TodoListController: UITableViewController {
 
     
     var itemsArray = [""]
+    let defaults = UserDefaults.standard
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
-        
+        if let items = defaults.array(forKey: "TodoArray") as? [String] {
+            itemsArray = items
+        }
 //        self.tableView.register(UITableViewCell.self, forCellReuseIdentifier: "TodoListCell")
         tableView.separatorStyle = .none
     }
@@ -34,7 +37,6 @@ class TodoListController: UITableViewController {
     //MARK - Tableview delegate methods.
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        
 
         if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark{
             tableView.cellForRow(at: indexPath)?.accessoryType = .none
@@ -90,7 +92,8 @@ class TodoListController: UITableViewController {
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             
             self.itemsArray.append(textField.text!)
-            
+
+            self.defaults.set(self.itemsArray, forKey: "TodoArray")
             self.tableView.reloadData()
         }
         alert.addTextField { (todoTextField) in
