@@ -11,20 +11,18 @@ import UIKit
 class TodoListController: UITableViewController {
     
     var itemsArray = [CellModel]()
-    let defaults = UserDefaults.standard
+    
+    //let defaults = UserDefaults.standard
+    let filePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
-        
-        let newItem = CellModel()
-        newItem.todoMessage = "hello todo first"
-        itemsArray.append(newItem)
-        
-        if let items = defaults.array(forKey: "TodoArray") as? [CellModel] {
-            itemsArray = items
-        }
-    
+//        if let items = defaults.array(forKey: "TodoArray") as? [CellModel] {
+//            itemsArray = items
+//        }
+        loadItems()
     }
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -53,8 +51,7 @@ class TodoListController: UITableViewController {
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
 
         itemsArray[indexPath.row].isChecked = !itemsArray[indexPath.row].isChecked
-        tableView.reloadData()
-        
+        saveItems()
 //        if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark{
 //            tableView.cellForRow(at: indexPath)?.accessoryType = .none
 //
@@ -69,7 +66,6 @@ class TodoListController: UITableViewController {
         cell!.selectedBackgroundView = bgColorView
 
         tableView.deselectRow(at: indexPath, animated: true)
-        print(indexPath.row)
     }
     
     
@@ -113,10 +109,10 @@ class TodoListController: UITableViewController {
             
             let item = CellModel()
             item.todoMessage = textField.text!
-            self.itemsArray.append(item)
             
-            self.defaults.set(self.itemsArray, forKey: "TodoArray")
-            self.tableView.reloadData()
+            self.itemsArray.append(item)
+            //self.defaults.set(self.itemsArray, forKey: "TodoArray")
+            self.saveItems()
         }
         alert.addTextField { (todoTextField) in
             todoTextField.placeholder = "add new todo"
@@ -124,7 +120,30 @@ class TodoListController: UITableViewController {
         }
         alert.addAction(action)
         present(alert, animated: true, completion: nil)
-
+    }
+    
+    func saveItems()  {
+        let encoder = PropertyListEncoder()
+        do{
+            let data = try encoder.encode(itemsArray)
+            try data.write(to: filePath!)
+            
+        }catch{
+            print("Error encoding the items array, \(error)")
+        }
+        tableView.reloadData()
+    }
+    
+    
+    func loadItems() {
+        if let data = try? Data(contentsOf: filePath!){
+            let decoder = PropertyListDecoder()
+            do{
+                itemsArray = try decoder.decode([CellModel].self, from: data)
+            }catch {
+                print("Data is not decoded properly, \(error)")
+            }
+        }
     }
 }
 

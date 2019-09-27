@@ -8,7 +8,7 @@
 
 import Foundation
 
-class CellModel {
+class CellModel : Encodable, Decodable {
     
     var todoMessage : String = ""
     var isChecked : Bool = false
