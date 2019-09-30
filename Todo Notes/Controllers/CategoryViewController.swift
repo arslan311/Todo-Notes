@@ -33,7 +33,7 @@ class CategoryViewController: UITableViewController {
         return row
     }
     
-    //MARK - add New Category to list
+    //MARK: - add New Category to list
     @IBAction func addNewCategory(_ sender: UIBarButtonItem) {
         
         var textField = UITextField()
@@ -55,13 +55,50 @@ class CategoryViewController: UITableViewController {
         present(alert, animated: true, completion: .none)
     }
     
+    //MARK: - TableView Swipe Behavior
+    override func tableView(_ tableView: UITableView,
+                            leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration?
+    {
+        let closeAction = UIContextualAction(style: .normal, title:  "Update", handler: { (ac:UIContextualAction, view:UIView, success:(Bool) -> Void) in
+            print("OK, marked as Closed")
+            success(true)
+        })
+        closeAction.image = UIImage(named: "tick")
+        closeAction.backgroundColor = .darkGray
+        return UISwipeActionsConfiguration(actions: [closeAction])
+        
+    }
+    override func tableView(_ tableView: UITableView,
+                            trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration?
+    {
+        let modifyAction = UIContextualAction(style: .normal, title:  "Delete", handler: { (ac:UIContextualAction, view:UIView, success:(Bool) -> Void) in
+            
+            self.context.delete(self.categoryArray[indexPath.row])
+            self.categoryArray.remove(at: indexPath.row)
+            self.saveCategory()
+            
+            success(true)
+        })
+        modifyAction.backgroundColor = .red
+        
+        return UISwipeActionsConfiguration(actions: [modifyAction])
+    }
+
     //MARK: - TableView Delegate Methods
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         print(categoryArray[indexPath.row].catName!)
         performSegue(withIdentifier: "gotoItems", sender: self)
     }
     
-    //MARK-  TableView Datasource Methods.
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        let destinationVC = segue.destination as! TodoListController
+        if let indexPath = tableView.indexPathForSelectedRow {
+            destinationVC.selectedCategory = categoryArray[indexPath.row]
+        }
+        
+    }
+    
+    //MARK: - TableView Datasource Methods.
     func saveCategory()  {
         
         do{
