@@ -55,6 +55,13 @@ class CategoryViewController: UITableViewController {
         present(alert, animated: true, completion: .none)
     }
     
+    //MARK: - TableView Delegate Methods
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        print(categoryArray[indexPath.row].catName!)
+        performSegue(withIdentifier: "gotoItems", sender: self)
+    }
+    
+    //MARK-  TableView Datasource Methods.
     func saveCategory()  {
         
         do{
@@ -73,6 +80,5 @@ class CategoryViewController: UITableViewController {
             print("error loading data \(error)")
         }
     }
-    
-    
+
 }
