@@ -7,21 +7,21 @@
 //
 
 import UIKit
+import CoreData
 
-class TodoListController: UITableViewController {
+class TodoListController: UITableViewController  {
     
     var itemsArray = [CellModel]()
     
     //let defaults = UserDefaults.standard
-    let filePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
+   
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     
-    
+    @IBOutlet weak var searchBar: UISearchBar!
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Do any additional setup after loading the view.
-//        if let items = defaults.array(forKey: "TodoArray") as? [CellModel] {
-//            itemsArray = items
-//        }
+        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
+       
         loadItems()
     }
     
@@ -38,11 +38,6 @@ class TodoListController: UITableViewController {
       
         row.accessoryType = item.isChecked ? .checkmark : .none
 
-//        if item.isChecked == true {
-//            row.accessoryType = .checkmark
-//        }else {
-//            row.accessoryType = .none
-//        }
         return row
     }
     
@@ -51,14 +46,8 @@ class TodoListController: UITableViewController {
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
 
         itemsArray[indexPath.row].isChecked = !itemsArray[indexPath.row].isChecked
+        
         saveItems()
-//        if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark{
-//            tableView.cellForRow(at: indexPath)?.accessoryType = .none
-//
-//        }else{
-//            tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
-//        }
-//
         
         let cell = tableView.cellForRow(at: indexPath)
         let bgColorView = UIView()
@@ -73,12 +62,12 @@ class TodoListController: UITableViewController {
     override func tableView(_ tableView: UITableView,
                    leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration?
     {
-        let closeAction = UIContextualAction(style: .normal, title:  "Close", handler: { (ac:UIContextualAction, view:UIView, success:(Bool) -> Void) in
+        let closeAction = UIContextualAction(style: .normal, title:  "Update", handler: { (ac:UIContextualAction, view:UIView, success:(Bool) -> Void) in
             print("OK, marked as Closed")
             success(true)
         })
         closeAction.image = UIImage(named: "tick")
-        closeAction.backgroundColor = .purple
+        closeAction.backgroundColor = .darkGray
         return UISwipeActionsConfiguration(actions: [closeAction])
 
     }
@@ -86,12 +75,15 @@ class TodoListController: UITableViewController {
     override func tableView(_ tableView: UITableView,
                    trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration?
     {
-        let modifyAction = UIContextualAction(style: .normal, title:  "Update", handler: { (ac:UIContextualAction, view:UIView, success:(Bool) -> Void) in
-            print("Update action ...")
+        let modifyAction = UIContextualAction(style: .normal, title:  "Delete", handler: { (ac:UIContextualAction, view:UIView, success:(Bool) -> Void) in
+            
+            self.context.delete(self.itemsArray[indexPath.row])
+            self.itemsArray.remove(at: indexPath.row)
+            self.saveItems()
+            
             success(true)
         })
-        //modifyAction.image = UIImage(named: "hammer")
-        modifyAction.backgroundColor = .blue
+        modifyAction.backgroundColor = .red
         
         return UISwipeActionsConfiguration(actions: [modifyAction])
     }
@@ -105,11 +97,11 @@ class TodoListController: UITableViewController {
         
         let alert = UIAlertController(title: "Add new Todo Item", message: "", preferredStyle: .alert)
         
-        let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
+        let action1 = UIAlertAction(title: "Add Item", style: .default) { (action) in
             
-            let item = CellModel()
+            let item = CellModel(context: self.context)
             item.todoMessage = textField.text!
-            
+            item.isChecked = false
             self.itemsArray.append(item)
             //self.defaults.set(self.itemsArray, forKey: "TodoArray")
             self.saveItems()
@@ -118,32 +110,74 @@ class TodoListController: UITableViewController {
             todoTextField.placeholder = "add new todo"
             textField = todoTextField
         }
-        alert.addAction(action)
+        alert.addAction(action1)
         present(alert, animated: true, completion: nil)
     }
     
     func saveItems()  {
-        let encoder = PropertyListEncoder()
         do{
-            let data = try encoder.encode(itemsArray)
-            try data.write(to: filePath!)
-            
+           try context.save()
         }catch{
-            print("Error encoding the items array, \(error)")
+            print("Error saving context \(error)")
         }
         tableView.reloadData()
     }
     
     
-    func loadItems() {
-        if let data = try? Data(contentsOf: filePath!){
-            let decoder = PropertyListDecoder()
-            do{
-                itemsArray = try decoder.decode([CellModel].self, from: data)
-            }catch {
-                print("Data is not decoded properly, \(error)")
-            }
+    func loadItems(with request: NSFetchRequest<CellModel> = CellModel.fetchRequest()) {
+        do{
+           itemsArray = try context.fetch(request)
+        }catch {
+            print("error request fetching data \(error)")
         }
+         tableView.reloadData()
     }
+
+}
+
+extension TodoListController : UISearchBarDelegate {
+
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        
+        if(searchBar.text!.isEmpty){
+            loadItems()
+        }
+        let request : NSFetchRequest<CellModel> = CellModel.fetchRequest()
+        
+         request.predicate = NSPredicate(format: "todoMessage contains[cd] %@", searchBar.text!)
+
+        request.sortDescriptors = [NSSortDescriptor(key: "todoMessage", ascending: true)]
+        
+        loadItems(with: request)
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchText.count == 0 {
+            loadItems()
+            DispatchQueue.main.async {
+                 searchBar.resignFirstResponder()
+            }
+           
+        }
+        
+    }
+    
+//    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+//        if !searchText.isEmpty {
+//
+//            var predicate: NSPredicate = NSPredicate()
+//            predicate = NSPredicate(format: "todoMessage contains[cd] '\(searchText)'")
+//            guard (UIApplication.shared.delegate as? AppDelegate) != nil else { return }
+//            //let managedObjectContext = appDelegate.persistentContainer.viewContext
+//            let request : NSFetchRequest<CellModel> = CellModel.fetchRequest()
+//            request.predicate = predicate
+//            do {
+//                itemsArray = try context.fetch(request)
+//            } catch let error as NSError {
+//                print("Could not fetch. \(error)")
+//            }
+//        }
+//        tableView.reloadData()
+//    }
 }
 
