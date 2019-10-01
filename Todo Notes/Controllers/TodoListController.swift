@@ -7,19 +7,20 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 class TodoListController: UITableViewController  {
     
-    var itemsArray = [CellModel]()
+    var realm = try! Realm()
+    
+    var todoItems : Results<CellModel>?
+    
     //let defaults = UserDefaults.standard
-    var selectedCategory : Categories? {
+    var selectedCategory : Category? {
         didSet{
             loadItems()
         }
     }
-    
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     
     @IBOutlet weak var searchBar: UISearchBar!
     override func viewDidLoad() {
@@ -29,18 +30,20 @@ class TodoListController: UITableViewController  {
     }
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return itemsArray.count
+        return todoItems?.count ?? 1
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
         let row = tableView.dequeueReusableCell(withIdentifier: "TodoListCell", for: indexPath)
-        
-        let item = itemsArray[indexPath.row]
-        row.textLabel?.text = item.todoMessage
-      
-        row.accessoryType = item.isChecked ? .checkmark : .none
 
+        if let item = todoItems?[indexPath.row] {
+            
+            row.textLabel?.text = item.itemName
+            row.accessoryType = item.isPressed ? .checkmark : .none
+        }else{
+        row.textLabel?.text = "No items added"
+        }
         return row
     }
     
@@ -48,19 +51,22 @@ class TodoListController: UITableViewController  {
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
 
-        itemsArray[indexPath.row].isChecked = !itemsArray[indexPath.row].isChecked
-        
-        saveItems()
-        
+        if let item = todoItems?[indexPath.row]{
+            do{
+            try realm.write {
+                item.isPressed = !item.isPressed
+                }
+            }catch {
+                print("error occured updating \(error)")
+            }
+        }
         let cell = tableView.cellForRow(at: indexPath)
         let bgColorView = UIView()
         bgColorView.backgroundColor = .purple
         cell!.selectedBackgroundView = bgColorView
-
         tableView.deselectRow(at: indexPath, animated: true)
+        tableView.reloadData()
     }
-    
-    
     
     override func tableView(_ tableView: UITableView,
                    leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration?
@@ -79,16 +85,19 @@ class TodoListController: UITableViewController  {
                    trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration?
     {
         let modifyAction = UIContextualAction(style: .normal, title:  "Delete", handler: { (ac:UIContextualAction, view:UIView, success:(Bool) -> Void) in
-            
-            self.context.delete(self.itemsArray[indexPath.row])
-            self.itemsArray.remove(at: indexPath.row)
-        
-            self.saveItems()
-            
+            do {
+                try self.realm.write {
+                self.realm.delete(self.todoItems![indexPath.row])
+            }
+            tableView.reloadData()
             success(true)
-        })
+            }catch{
+                print("Error deleting \(error)")
+            }
+            
+        }
+            )
         modifyAction.backgroundColor = .red
-        
         return UISwipeActionsConfiguration(actions: [modifyAction])
     }
 
@@ -102,15 +111,22 @@ class TodoListController: UITableViewController  {
         let alert = UIAlertController(title: "Add new Todo Item", message: "", preferredStyle: .alert)
         
         let action1 = UIAlertAction(title: "Add Item", style: .default) { (action) in
-            
-            let item = CellModel(context: self.context)
-            item.todoMessage = textField.text!
-            item.isChecked = false
-            item.parentCategory = self.selectedCategory
-            self.itemsArray.append(item)
-            //self.defaults.set(self.itemsArray, forKey: "TodoArray")
-            self.saveItems()
+
+            if let currentCategory = self.selectedCategory {
+            do{
+                try self.realm.write {
+                    
+                    let item = CellModel()
+                    item.itemName = textField.text!
+                    item.dateCreated = self.getDateTime()
+                    currentCategory.items.append(item)
+                }
+            }catch{
+                print("Item not saved \(error)")
+            }
         }
+            self.tableView.reloadData()
+    }
         alert.addTextField { (todoTextField) in
             todoTextField.placeholder = "add new todo"
             textField = todoTextField
@@ -119,78 +135,42 @@ class TodoListController: UITableViewController  {
         present(alert, animated: true, completion: nil)
     }
     
-    func saveItems()  {
-        do{
-           try context.save()
-        }catch{
-            print("Error saving context \(error)")
-        }
+    func loadItems() {
+        
+        todoItems = selectedCategory?.items.sorted(byKeyPath: "itemName", ascending: true)
         tableView.reloadData()
     }
-    
-    
-    func loadItems(with request: NSFetchRequest<CellModel> = CellModel.fetchRequest(), predicate : NSPredicate? = nil) {
-        
-        let categorypredicate = NSPredicate(format: "parentCategory.catName MATCHES %@", selectedCategory!.catName!)
-        if let additionalPredicate = predicate {
-            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [categorypredicate, additionalPredicate])
-        }else{
-            request.predicate = categorypredicate
-        }
-        do{
-           itemsArray = try context.fetch(request)
-        }catch {
-            print("error request fetching data \(error)")
-        }
-         tableView.reloadData()
-    }
 
+    func getDateTime() -> String {
+        let currentDateTime = Date()
+        // initialize the date formatter and set the style
+        let formatter = DateFormatter()
+        formatter.timeStyle = .medium
+        formatter.dateStyle = .long
+        
+        // get the date time String from the date object
+        return formatter.string(from: currentDateTime)
+        // October 8, 2016 at 10:48:53 PM
+    }
 }
 
 extension TodoListController : UISearchBarDelegate {
 
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         
-        if(searchBar.text!.isEmpty){
-            loadItems()
-        }
-        let request : NSFetchRequest<CellModel> = CellModel.fetchRequest()
-        
-         
-        let predicate = NSPredicate(format: "todoMessage contains[cd] %@", searchBar.text!)
-        request.predicate = predicate
-        request.sortDescriptors = [NSSortDescriptor(key: "todoMessage", ascending: true)]
-        
-        loadItems(with: request, predicate: predicate)
+        todoItems = todoItems?.filter("itemName contains[cd] %@", searchBar.text!).sorted(byKeyPath: "dateCreated", ascending: true)
+        tableView.reloadData()
     }
-    
+
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         if searchText.count == 0 {
             loadItems()
             DispatchQueue.main.async {
                  searchBar.resignFirstResponder()
             }
-           
+
         }
-        
+
     }
-    
-//    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-//        if !searchText.isEmpty {
-//
-//            var predicate: NSPredicate = NSPredicate()
-//            predicate = NSPredicate(format: "todoMessage contains[cd] '\(searchText)'")
-//            guard (UIApplication.shared.delegate as? AppDelegate) != nil else { return }
-//            //let managedObjectContext = appDelegate.persistentContainer.viewContext
-//            let request : NSFetchRequest<CellModel> = CellModel.fetchRequest()
-//            request.predicate = predicate
-//            do {
-//                itemsArray = try context.fetch(request)
-//            } catch let error as NSError {
-//                print("Could not fetch. \(error)")
-//            }
-//        }
-//        tableView.reloadData()
-//    }
 }
 

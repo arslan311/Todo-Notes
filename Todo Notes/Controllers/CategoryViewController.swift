@@ -7,12 +7,12 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 class CategoryViewController: UITableViewController {
     
-    var categoryArray = [Categories]()
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    var realm = try! Realm()
+    var categoryArray : Results<Category>?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -23,12 +23,12 @@ class CategoryViewController: UITableViewController {
     //MARK - TableView delegate methods
    
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return categoryArray.count
+        return categoryArray?.count ?? 1
     }
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
         let row = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
-        row.textLabel?.text = categoryArray[indexPath.row].catName
+        row.textLabel?.text = categoryArray?[indexPath.row].catName ?? "No Categories Added"
         
         return row
     }
@@ -41,10 +41,10 @@ class CategoryViewController: UITableViewController {
         
         let action = UIAlertAction(title: "Add Category", style: .default) { (alertaction) in
         
-        let category = Categories(context: self.context)
+        let category = Category()
         category.catName = textField.text!
-        self.categoryArray.append(category)
-        self.saveCategory()
+        
+        self.save(category: category)
         }
         
         alert.addTextField { (categorytextfield) in
@@ -73,10 +73,10 @@ class CategoryViewController: UITableViewController {
     {
         let modifyAction = UIContextualAction(style: .normal, title:  "Delete", handler: { (ac:UIContextualAction, view:UIView, success:(Bool) -> Void) in
             
-            self.context.delete(self.categoryArray[indexPath.row])
-            self.categoryArray.remove(at: indexPath.row)
-            self.saveCategory()
-            
+//            self.context.delete(self.categoryArray[indexPath.row])
+//            self.categoryArray.remove(at: indexPath.row)
+//            self.save()
+//
             success(true)
         })
         modifyAction.backgroundColor = .red
@@ -86,23 +86,25 @@ class CategoryViewController: UITableViewController {
 
     //MARK: - TableView Delegate Methods
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        print(categoryArray[indexPath.row].catName!)
+        //print(categoryArray[indexPath.row].catName!)
         performSegue(withIdentifier: "gotoItems", sender: self)
     }
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         let destinationVC = segue.destination as! TodoListController
         if let indexPath = tableView.indexPathForSelectedRow {
-            destinationVC.selectedCategory = categoryArray[indexPath.row]
+            destinationVC.selectedCategory = categoryArray?[indexPath.row]
         }
         
     }
     
     //MARK: - TableView Datasource Methods.
-    func saveCategory()  {
+    func save(category : Category)  {
         
         do{
-        try context.save()
+            try realm.write {
+                realm.add(category)
+            }
         }catch {
             print("Error saving Category \(error)")
         }
@@ -110,12 +112,9 @@ class CategoryViewController: UITableViewController {
     }
     
     func loadCategories() {
-        let req : NSFetchRequest<Categories> = Categories.fetchRequest()
-        do{
-        categoryArray = try context.fetch(req)
-        }catch {
-            print("error loading data \(error)")
-        }
+        
+        categoryArray = realm.objects(Category.self)
+        tableView.reloadData()
     }
 
 }
